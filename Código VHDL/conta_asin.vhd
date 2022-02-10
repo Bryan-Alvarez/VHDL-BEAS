@@ -1,0 +1,78 @@
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.NUMERIC_STD.ALL;
+USE IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+ENTITY conta_asin IS
+	PORT(ASC, CLK_MST: IN STD_LOGIC;
+	        COUNT: BUFFER STD_LOGIC_VECTOR(2 DOWNTO 0) := "000";
+		       SEG: OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
+				 DIG: OUT STD_LOGIC;
+	        CARRY: OUT STD_LOGIC);
+END ENTITY;
+
+ARCHITECTURE BEAS OF conta_asin IS
+SIGNAL AUX, CLK: STD_LOGIC;
+SIGNAL RETA: INTEGER RANGE 0 TO 100000 := 0;
+SIGNAL DIV: INTEGER RANGE 0 TO 24999 := 0;
+
+TYPE ESTADOS IS (INI, E1, DELAY);
+SIGNAL PRES: ESTADOS := INI;
+
+BEGIN
+
+	PROCESS(CLK_MST)
+	BEGIN
+		IF RISING_EDGE (CLK_MST) THEN
+			IF DIV = 0 THEN
+				CLK <= NOT CLK;
+				DIV <= 29;
+			ELSE
+				DIV <= DIV - 1;
+			END IF;
+		END IF;
+	END PROCESS;
+
+	PROCESS(CLK, ASC)
+	BEGIN
+		IF RISING_EDGE(CLK) THEN
+			CASE PRES IS
+				WHEN INI => IF ASC = '0' THEN
+									PRES <= E1;
+								ELSE
+									PRES <= INI;
+								END IF;
+				
+				WHEN E1 => 	IF COUNT = "111" THEN
+									CARRY <= '1';
+									COUNT <= "000";
+								ELSE
+									COUNT <= COUNT + "001";
+									CARRY <= '0';
+								END IF;				
+								PRES <= DELAY;
+				
+				WHEN DELAY => IF RETA = 100000 THEN
+									  RETA <= 0;
+									  PRES <= INI;
+								  ELSE	
+									  RETA <= RETA + 1;
+								  END IF;
+			END CASE;
+		END IF;
+	END PROCESS;
+	
+	DIG <= '0';
+	
+	WITH COUNT SELECT
+		  SEG <= "00000011" WHEN "000", -- 0
+					"10011111" WHEN "001", -- 1
+					"00100101" WHEN "010", -- 2
+					"00001101" WHEN "011", -- 3
+					"10011001" WHEN "100", -- 4
+					"01001001" WHEN "101", -- 5
+					"01000001" WHEN "110", -- 6
+					"00011111" WHEN "111", -- 7
+					"11111111" WHEN OTHERS;
+	
+END BEAS;
